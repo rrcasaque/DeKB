@@ -1,3 +1,11 @@
 /backend/node_modules
 /backend/.env
 /backend/dist
+/backend/contracts/node_modules
+/backend/contracts/.env
+/backend/contracts/artifacts
+/backend/contracts/cache
+/backend/contracts/deployments
+/vectorStore
+/LLM/node_modules   
+/LLM/.env
