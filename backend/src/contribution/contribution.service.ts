@@ -13,13 +13,11 @@ import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 
+// Interface atualizada para refletir a nova estrutura da Contribution
 export interface ContributionDetails {
   contributorAddress: string;
-  timestamp: number;
-  documentHash: string;
-  vectorStoreId: string;
-  documentTitle: string;
-  ipfsHash: string;
+  timestamp: number;  
+  contributionURL: string; // Campo atualizado
   tags: string[];
 }
 
@@ -31,9 +29,8 @@ export class ContributionService {
   private wallet: ethers.Wallet;
 
   constructor() {
-    // const rpcUrl = process.env.POLYGON_AMOY_RPC_URL
     const rpcUrl = 'http://127.0.0.1:8545/';
-    const privateKey = process.env.PRIVATE_KEY;    
+    const privateKey = process.env.PRIVATE_KEY;
 
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
     this.wallet = new ethers.Wallet(privateKey, this.provider);
@@ -45,9 +42,9 @@ export class ContributionService {
     let contractAddress: string;
     try {
       const deployments = JSON.parse(fs.readFileSync(deploymentsPath, 'utf-8'));
-      contractAddress = deployments.KnowledgeBaseContributor;      
+      contractAddress = deployments.KnowledgeBaseContributor;
     } catch (e) {
-      this.logger.error(`Erro ao carregar endereço do contrato: ${e.message}`);      
+      this.logger.error(`Erro ao carregar endereço do contrato: ${e.message}`);
     }
 
     this.contract = KnowledgeBaseContributor__factory.connect(
@@ -59,101 +56,57 @@ export class ContributionService {
   async addContribution(
     createContributionDto: CreateContributionDto
   ): Promise<bigint> {
-    await this.addContributionToVectorStore(createContributionDto.url);
+    await this.addContributionToVectorStore(createContributionDto.contributionURL);
     this.logger.log('Chamando addContribution no smart contract...');
-    try {
-      // Chamada à função do contrato com os dados tipados
-      const tx = await this.contract.addContribution(
-        createContributionDto.documentHash,
-        createContributionDto.vectorStoreId,
-        createContributionDto.documentTitle,
-        createContributionDto.ipfsHash,
+  
+    try {      
+      const dynamicWallet = new ethers.Wallet(createContributionDto.privateKey, this.provider);
+      const dynamicContract = this.contract.connect(dynamicWallet);
+  
+      const tx = await dynamicContract.addContribution(
+        createContributionDto.contributionURL,
         createContributionDto.tags
       );
-
-      this.logger.log(`Transação de addContribution enviada. Hash: ${tx.hash}`);
-
-      // Espera a transação ser minerada e confirmada
+  
+      this.logger.log(`Transação enviada. Hash: ${tx.hash}`);
+  
       const receipt = await tx.wait();
-      this.logger.log(
-        `Transação de addContribution confirmada no bloco: ${receipt.blockNumber}`
-      );
-
-      // O contrato retorna o contributionId, que pode ser acessado pelo `Result` da transação
-      // No ethers v6, TypedContractMethod retorna os tipos de saída diretamente.
-      // Para `addContribution`, o retorno é `uint256`, que o Typechain mapeia para `bigint`.
-      // O evento 'ContributionAdded' também é uma boa fonte para pegar o ID.
-
-      // Uma maneira robusta de obter o ID é através do evento emitido.
-      // Percorra os logs do recibo para encontrar o evento ContributionAdded.
+      this.logger.log(`Transação confirmada no bloco: ${receipt.blockNumber}`);
+  
       let contributionId: bigint | undefined;
       if (receipt && receipt.logs) {
         for (const log of receipt.logs) {
           try {
-            const parsedLog = this.contract.interface.parseLog(log);
+            const parsedLog = dynamicContract.interface.parseLog(log);
             if (parsedLog && parsedLog.name === 'ContributionAdded') {
-              // Supondo que 'contributionId' é o primeiro argumento indexado do evento
               contributionId = parsedLog.args.contributionId;
               break;
             }
-          } catch (parseError) {
-            // Ignorar logs que não são do nosso contrato ou eventos não reconhecidos
-          }
+          } catch {}
         }
       }
-
+  
       if (contributionId === undefined) {
-        this.logger.warn(
-          'Não foi possível encontrar o contributionId no evento da transação. Verifique o log do contrato.'
-        );
-        // Em casos onde o evento não é capturado, você poderia retornar 0n ou lançar um erro
-        // ou até mesmo chamar getTotalContributions() para pegar o último ID, mas isso é menos robusto.
+        this.logger.warn('Não foi possível encontrar o contributionId no evento.');
       }
-
-      return contributionId || 0n; // Retorna o ID ou 0n se não encontrado
+  
+      return contributionId || 0n;
     } catch (error) {
-      this.logger.error(
-        'Erro ao adicionar contribuição no contrato:',
-        error.message
-      );
-      // Logar o erro completo para depuração
-      if (error.data) {
-        // Erro de revert do EVM
-        try {
-          const decodedError = this.contract.interface.parseError(error.data);
-          if (decodedError) {
-            this.logger.error(
-              `Erro de contrato: ${decodedError.name}(${decodedError.args.join(', ')})`
-            );
-          } else {
-            this.logger.error(
-              `Erro de transação com dados desconhecidos: ${error.data}`
-            );
-          }
-        } catch (e) {
-          this.logger.error(
-            `Erro ao decodificar erro de contrato: ${e.message}`
-          );
-        }
-      }
-      throw new Error(
-        `Falha ao registrar contribuição on-chain: ${error.message}`
-      );
+      this.logger.error('Erro ao adicionar contribuição no contrato:', error.message);
+      throw new Error(`Falha ao registrar contribuição on-chain: ${error.message}`);
     }
   }
+  
 
-  async getContributionDetails(id: number) {
+  async getContributionDetails(id: number): Promise<ContributionDetails> {
     this.logger.log(`Buscando detalhes da contribuição com ID: ${id}`);
     try {
       const contribution = await this.contract.getContribution(id);
 
       return {
         contributorAddress: contribution.contributorAddress,
-        timestamp: Number(contribution.timestamp),
-        documentHash: contribution.documentHash,
-        vectorStoreId: contribution.vectorStoreId,
-        documentTitle: contribution.documentTitle,
-        ipfsHash: contribution.ipfsHash,
+        timestamp: Number(contribution.timestamp),        
+        contributionURL: contribution.contributionURL, // Campo atualizado
         tags: contribution.tags,
       };
     } catch (error) {
@@ -197,10 +150,7 @@ export class ContributionService {
           allContributionsDetails.push({
             contributorAddress: contribution.contributorAddress,
             timestamp: Number(contribution.timestamp),
-            documentHash: contribution.documentHash,
-            vectorStoreId: contribution.vectorStoreId,
-            documentTitle: contribution.documentTitle,
-            ipfsHash: contribution.ipfsHash,
+            contributionURL: contribution.contributionURL, // Campo atualizado
             tags: contribution.tags,
           });
         } catch (innerError) {
@@ -223,8 +173,35 @@ export class ContributionService {
     }
   }
 
-  async createVectorStore(urlContribution: string): Promise<void> {
-    const url = urlContribution;
+  async getAllContributions(): Promise<ContributionDetails[]> {
+    this.logger.log('Buscando todas as contribuições registradas no contrato.');
+    try {      
+
+      const totalContributions = await this.getTotalContributions();
+      this.logger.log(`Total de contribuições encontradas: ${totalContributions}`);
+
+      const allContributions: ContributionDetails[] = [];
+
+      const contribution = await this.contract.getAllContributions();
+
+      contribution.map((contribution) => {
+        allContributions.push({
+          contributorAddress: contribution.contributorAddress,
+          timestamp: Number(contribution.timestamp),
+          contributionURL: contribution.contributionURL, // Campo atualizado
+          tags: contribution.tags,
+        });
+      });
+      
+      this.logger.log(`Retornando ${allContributions.length} objetos de todas as contribuições.`);
+      return allContributions;
+    } catch (error) {
+      this.logger.error('Erro ao obter todas as contribuições:', error.message);
+      throw new Error('Falha ao buscar todas as contribuições on-chain.');
+    }
+  }
+  async createVectorStore(contributionURL: string): Promise<void> {
+    const url = contributionURL;
     const FAISS_PATH = './../vectorStore';
 
     try {
@@ -238,7 +215,7 @@ export class ContributionService {
     }
 
     const embeddings = new GoogleGenerativeAIEmbeddings({ apiKey: process.env.GEMINI_API_KEY });
-    let vectorStore:any;    
+    let vectorStore: any;
 
     const loader = new CheerioWebBaseLoader(url);
     const docs = await loader.load();
@@ -253,17 +230,17 @@ export class ContributionService {
     await vectorStore.save(FAISS_PATH);
   }
 
-  async updateVectorStore(urlContribution: string): Promise<void> {
+  async updateVectorStore(contributionURL: string): Promise<void> {
     const FAISS_PATH = './../vectorStore';
-    const embeddings = new GoogleGenerativeAIEmbeddings({ apiKey: process.env.GEMINI_API_KEY });    
+    const embeddings = new GoogleGenerativeAIEmbeddings({ apiKey: process.env.GEMINI_API_KEY });
 
     try {
-      await axios.head(urlContribution);
+      await axios.head(contributionURL);
     } catch (error) {
-      throw new Error(`URL inacessível para atualização: ${urlContribution}`);
+      throw new Error(`URL inacessível para atualização: ${contributionURL}`);
     }
 
-    const loader = new CheerioWebBaseLoader(urlContribution);
+    const loader = new CheerioWebBaseLoader(contributionURL);
     const docs = await loader.load();
 
     if (docs.length === 0) {
@@ -277,7 +254,7 @@ export class ContributionService {
     const splits = await textSplitter.splitDocuments(docs);
 
     let vectorStore: FaissStore;
-    try {      
+    try {
       vectorStore = await FaissStore.load(FAISS_PATH, embeddings);
       const newVectorStore = await FaissStore.fromDocuments(splits, embeddings);
       await vectorStore.mergeFrom(newVectorStore);
@@ -290,18 +267,21 @@ export class ContributionService {
 
   validateExistenceVectorStore(): boolean {
     try {
+      // Recomendo verificar a existência de um arquivo específico dentro da pasta
+      // ao invés de apenas a pasta, para ter certeza que o vector store está 'válido'.
+      // Ex: fs.existsSync(path.join('./../vectorStore', 'some_expected_file.faiss'))
       const vectorFolder = fs.readdirSync('./../vectorStore');
-      return true;
+      return vectorFolder.length > 0; // Verifica se a pasta não está vazia
     } catch (error) {
       return false;
     }
   }
-  
-  async addContributionToVectorStore(urlContribution: string): Promise<void> {
+
+  async addContributionToVectorStore(contributionURL: string): Promise<void> {
     if (this.validateExistenceVectorStore()) {
-      return await this.updateVectorStore(urlContribution);
+      return await this.updateVectorStore(contributionURL);
     } else {
-      return await this.createVectorStore(urlContribution);
+      return await this.createVectorStore(contributionURL);
     }
   }
 }

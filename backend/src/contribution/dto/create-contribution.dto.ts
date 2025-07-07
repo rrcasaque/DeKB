@@ -1,29 +1,17 @@
-import { IsString, IsArray, ArrayMinSize, IsOptional, IsNotEmpty } from 'class-validator';
+import { IsString, IsArray, ArrayMinSize, IsNotEmpty } from 'class-validator';
 
-export class CreateContributionDto {
-  @IsString()
-  @IsNotEmpty()
-  documentHash: string;
-
-  @IsString()
-  @IsNotEmpty()
-  walletPrivateKey: string;
-
+export class CreateContributionDto {  
   @IsString()
   @IsNotEmpty()
   vectorStoreId: string;
 
   @IsString()
   @IsNotEmpty()
-  url: string;
+  privateKey: string;
 
   @IsString()
   @IsNotEmpty()
-  documentTitle: string;
-
-  @IsString()
-  @IsOptional()
-  ipfsHash: string;
+  contributionURL: string;
 
   @IsArray()
   @IsString({ each: true })

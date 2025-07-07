@@ -11,6 +11,11 @@ export class ContributionController {
     return this.contributionService.addContribution(createContributionDto);
   }
 
+  @Get("")
+  getAllContributions() {
+    return this.contributionService.getAllContributions();
+  }
+
   @Get("/getTotalContributions")
   getTotalContributions() {
     return this.contributionService.getTotalContributions();
