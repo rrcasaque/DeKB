@@ -23,15 +23,38 @@ import type {
   TypedContractMethod,
 } from "./common";
 
+export declare namespace KnowledgeBaseContributor {
+  export type ContributionStruct = {
+    contributorAddress: AddressLike;
+    timestamp: BigNumberish;
+    contributionURL: string;
+    tags: string[];
+  };
+
+  export type ContributionStructOutput = [
+    contributorAddress: string,
+    timestamp: bigint,
+    contributionURL: string,
+    tags: string[]
+  ] & {
+    contributorAddress: string;
+    timestamp: bigint;
+    contributionURL: string;
+    tags: string[];
+  };
+}
+
 export interface KnowledgeBaseContributorInterface extends Interface {
   getFunction(
     nameOrSignature:
       | "addContribution"
-      | "addContribution(string,string,string,string,string[])"
+      | "addContribution(string,string[])"
       | "contributions"
       | "contributions(uint256)"
       | "contributorContributions"
       | "contributorContributions(address,uint256)"
+      | "getAllContributions"
+      | "getAllContributions()"
       | "getContribution"
       | "getContribution(uint256)"
       | "getContributionsByContributor"
@@ -43,16 +66,16 @@ export interface KnowledgeBaseContributorInterface extends Interface {
   getEvent(
     nameOrSignatureOrTopic:
       | "ContributionAdded"
-      | "ContributionAdded(uint256,address,string,string,string)"
+      | "ContributionAdded(uint256,address,string)"
   ): EventFragment;
 
   encodeFunctionData(
     functionFragment: "addContribution",
-    values: [string, string, string, string, string[]]
+    values: [string, string[]]
   ): string;
   encodeFunctionData(
-    functionFragment: "addContribution(string,string,string,string,string[])",
-    values: [string, string, string, string, string[]]
+    functionFragment: "addContribution(string,string[])",
+    values: [string, string[]]
   ): string;
   encodeFunctionData(
     functionFragment: "contributions",
@@ -69,6 +92,14 @@ export interface KnowledgeBaseContributorInterface extends Interface {
   encodeFunctionData(
     functionFragment: "contributorContributions(address,uint256)",
     values: [AddressLike, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getAllContributions",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getAllContributions()",
+    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "getContribution",
@@ -100,7 +131,7 @@ export interface KnowledgeBaseContributorInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "addContribution(string,string,string,string,string[])",
+    functionFragment: "addContribution(string,string[])",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -117,6 +148,14 @@ export interface KnowledgeBaseContributorInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "contributorContributions(address,uint256)",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getAllContributions",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getAllContributions()",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -149,23 +188,17 @@ export namespace ContributionAddedEvent {
   export type InputTuple = [
     contributionId: BigNumberish,
     contributor: AddressLike,
-    documentTitle: string,
-    vectorStoreId: string,
-    ipfsHash: string
+    contributionURL: string
   ];
   export type OutputTuple = [
     contributionId: bigint,
     contributor: string,
-    documentTitle: string,
-    vectorStoreId: string,
-    ipfsHash: string
+    contributionURL: string
   ];
   export interface OutputObject {
     contributionId: bigint;
     contributor: string;
-    documentTitle: string;
-    vectorStoreId: string;
-    ipfsHash: string;
+    contributionURL: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -217,25 +250,13 @@ export interface KnowledgeBaseContributor extends BaseContract {
   ): Promise<this>;
 
   addContribution: TypedContractMethod<
-    [
-      _documentHash: string,
-      _vectorStoreId: string,
-      _documentTitle: string,
-      _ipfsHash: string,
-      _tags: string[]
-    ],
+    [_contributionURL: string, _tags: string[]],
     [bigint],
     "nonpayable"
   >;
 
-  "addContribution(string,string,string,string,string[])": TypedContractMethod<
-    [
-      _documentHash: string,
-      _vectorStoreId: string,
-      _documentTitle: string,
-      _ipfsHash: string,
-      _tags: string[]
-    ],
+  "addContribution(string,string[])": TypedContractMethod<
+    [_contributionURL: string, _tags: string[]],
     [bigint],
     "nonpayable"
   >;
@@ -243,13 +264,10 @@ export interface KnowledgeBaseContributor extends BaseContract {
   contributions: TypedContractMethod<
     [arg0: BigNumberish],
     [
-      [string, bigint, string, string, string, string] & {
+      [string, bigint, string] & {
         contributorAddress: string;
         timestamp: bigint;
-        documentHash: string;
-        vectorStoreId: string;
-        documentTitle: string;
-        ipfsHash: string;
+        contributionURL: string;
       }
     ],
     "view"
@@ -258,13 +276,10 @@ export interface KnowledgeBaseContributor extends BaseContract {
   "contributions(uint256)": TypedContractMethod<
     [arg0: BigNumberish],
     [
-      [string, bigint, string, string, string, string] & {
+      [string, bigint, string] & {
         contributorAddress: string;
         timestamp: bigint;
-        documentHash: string;
-        vectorStoreId: string;
-        documentTitle: string;
-        ipfsHash: string;
+        contributionURL: string;
       }
     ],
     "view"
@@ -282,16 +297,25 @@ export interface KnowledgeBaseContributor extends BaseContract {
     "view"
   >;
 
+  getAllContributions: TypedContractMethod<
+    [],
+    [KnowledgeBaseContributor.ContributionStructOutput[]],
+    "view"
+  >;
+
+  "getAllContributions()": TypedContractMethod<
+    [],
+    [KnowledgeBaseContributor.ContributionStructOutput[]],
+    "view"
+  >;
+
   getContribution: TypedContractMethod<
     [_contributionId: BigNumberish],
     [
-      [string, bigint, string, string, string, string, string[]] & {
+      [string, bigint, string, string[]] & {
         contributorAddress: string;
         timestamp: bigint;
-        documentHash: string;
-        vectorStoreId: string;
-        documentTitle: string;
-        ipfsHash: string;
+        contributionURL: string;
         tags: string[];
       }
     ],
@@ -301,13 +325,10 @@ export interface KnowledgeBaseContributor extends BaseContract {
   "getContribution(uint256)": TypedContractMethod<
     [_contributionId: BigNumberish],
     [
-      [string, bigint, string, string, string, string, string[]] & {
+      [string, bigint, string, string[]] & {
         contributorAddress: string;
         timestamp: bigint;
-        documentHash: string;
-        vectorStoreId: string;
-        documentTitle: string;
-        ipfsHash: string;
+        contributionURL: string;
         tags: string[];
       }
     ],
@@ -337,26 +358,14 @@ export interface KnowledgeBaseContributor extends BaseContract {
   getFunction(
     nameOrSignature: "addContribution"
   ): TypedContractMethod<
-    [
-      _documentHash: string,
-      _vectorStoreId: string,
-      _documentTitle: string,
-      _ipfsHash: string,
-      _tags: string[]
-    ],
+    [_contributionURL: string, _tags: string[]],
     [bigint],
     "nonpayable"
   >;
   getFunction(
-    nameOrSignature: "addContribution(string,string,string,string,string[])"
+    nameOrSignature: "addContribution(string,string[])"
   ): TypedContractMethod<
-    [
-      _documentHash: string,
-      _vectorStoreId: string,
-      _documentTitle: string,
-      _ipfsHash: string,
-      _tags: string[]
-    ],
+    [_contributionURL: string, _tags: string[]],
     [bigint],
     "nonpayable"
   >;
@@ -365,13 +374,10 @@ export interface KnowledgeBaseContributor extends BaseContract {
   ): TypedContractMethod<
     [arg0: BigNumberish],
     [
-      [string, bigint, string, string, string, string] & {
+      [string, bigint, string] & {
         contributorAddress: string;
         timestamp: bigint;
-        documentHash: string;
-        vectorStoreId: string;
-        documentTitle: string;
-        ipfsHash: string;
+        contributionURL: string;
       }
     ],
     "view"
@@ -381,13 +387,10 @@ export interface KnowledgeBaseContributor extends BaseContract {
   ): TypedContractMethod<
     [arg0: BigNumberish],
     [
-      [string, bigint, string, string, string, string] & {
+      [string, bigint, string] & {
         contributorAddress: string;
         timestamp: bigint;
-        documentHash: string;
-        vectorStoreId: string;
-        documentTitle: string;
-        ipfsHash: string;
+        contributionURL: string;
       }
     ],
     "view"
@@ -407,17 +410,28 @@ export interface KnowledgeBaseContributor extends BaseContract {
     "view"
   >;
   getFunction(
+    nameOrSignature: "getAllContributions"
+  ): TypedContractMethod<
+    [],
+    [KnowledgeBaseContributor.ContributionStructOutput[]],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "getAllContributions()"
+  ): TypedContractMethod<
+    [],
+    [KnowledgeBaseContributor.ContributionStructOutput[]],
+    "view"
+  >;
+  getFunction(
     nameOrSignature: "getContribution"
   ): TypedContractMethod<
     [_contributionId: BigNumberish],
     [
-      [string, bigint, string, string, string, string, string[]] & {
+      [string, bigint, string, string[]] & {
         contributorAddress: string;
         timestamp: bigint;
-        documentHash: string;
-        vectorStoreId: string;
-        documentTitle: string;
-        ipfsHash: string;
+        contributionURL: string;
         tags: string[];
       }
     ],
@@ -428,13 +442,10 @@ export interface KnowledgeBaseContributor extends BaseContract {
   ): TypedContractMethod<
     [_contributionId: BigNumberish],
     [
-      [string, bigint, string, string, string, string, string[]] & {
+      [string, bigint, string, string[]] & {
         contributorAddress: string;
         timestamp: bigint;
-        documentHash: string;
-        vectorStoreId: string;
-        documentTitle: string;
-        ipfsHash: string;
+        contributionURL: string;
         tags: string[];
       }
     ],
@@ -461,15 +472,15 @@ export interface KnowledgeBaseContributor extends BaseContract {
     ContributionAddedEvent.OutputObject
   >;
   getEvent(
-    key: "ContributionAdded(uint256,address,string,string,string)"
+    key: "ContributionAdded(uint256,address,string)"
   ): TypedContractEvent<
-    ContributionAdded_uint256_address_string_string_string_Event.InputTuple,
-    ContributionAdded_uint256_address_string_string_string_Event.OutputTuple,
-    ContributionAdded_uint256_address_string_string_string_Event.OutputObject
+    ContributionAdded_uint256_address_string_Event.InputTuple,
+    ContributionAdded_uint256_address_string_Event.OutputTuple,
+    ContributionAdded_uint256_address_string_Event.OutputObject
   >;
 
   filters: {
-    "ContributionAdded(uint256,address,string,string,string)": TypedContractEvent<
+    "ContributionAdded(uint256,address,string)": TypedContractEvent<
       ContributionAddedEvent.InputTuple,
       ContributionAddedEvent.OutputTuple,
       ContributionAddedEvent.OutputObject
