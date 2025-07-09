@@ -1,3 +1,5 @@
+[[Assista ao vídeo de Contexualização + demonstração da POC]](https://www.youtube.com/embed/LxmhgupKTmU?si=f51UYwy-nQ6qXS-R)
+
 # DeKB - Descentralized Knowledge Base
 
 ## 🚀 Como Rodar o Projeto
